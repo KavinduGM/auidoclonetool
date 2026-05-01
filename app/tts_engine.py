@@ -48,6 +48,11 @@ class VoiceEngine:
                 parts = re.split(r'(?<=[,;:])\s+', s)
                 for p in parts:
                     if len(p) > max_chars:
+                        # Flush buf before word-splitting: otherwise chunks from this
+                        # part get appended while buf still holds an earlier clause.
+                        if buf:
+                            chunks.append(buf.strip())
+                            buf = ""
                         # last resort: break on spaces
                         words = p.split()
                         cur = ""
