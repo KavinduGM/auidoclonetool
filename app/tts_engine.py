@@ -16,6 +16,10 @@ from TTS.api import TTS
 os.environ.setdefault("COQUI_TOS_AGREED", "1")
 
 
+# Marks "12. " list-style periods so sentence splitting does not break after the dot.
+_LIST_PERIOD_MARK = "\uE000"
+
+
 class VoiceEngine:
     def __init__(self):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -23,6 +27,23 @@ class VoiceEngine:
         self.tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(self.device)
         self.language = "en"
         print("[tts_engine] Model loaded.")
+
+    @staticmethod
+    def _protect_list_periods(text: str) -> str:
+        """
+        Hide periods after digits when followed by whitespace so they are not treated
+        as sentence ends (e.g. '2. __' must stay one phrase, not ['2.', '__']).
+        Decimals like '3.14' are unchanged (no whitespace after the first dot).
+        """
+        return re.sub(
+            r"(\d+)\.(\s)",
+            lambda m: f"{m.group(1)}{_LIST_PERIOD_MARK}{m.group(2)}",
+            text,
+        )
+
+    @staticmethod
+    def _restore_list_periods(text: str) -> str:
+        return text.replace(_LIST_PERIOD_MARK, ".")
 
     # ---------- text chunking ----------
     @staticmethod
@@ -35,12 +56,13 @@ class VoiceEngine:
         if not text:
             return []
 
-        # split into sentences
+        text = VoiceEngine._protect_list_periods(text)
+        # split into sentences (list markers like "2. " no longer end with '.' for this step)
         sentences = re.split(r'(?<=[.!?])\s+', text)
         chunks: List[str] = []
         buf = ""
         for s in sentences:
-            s = s.strip()
+            s = VoiceEngine._restore_list_periods(s).strip()
             if not s:
                 continue
             # if sentence itself too long, hard-split on commas / spaces
@@ -87,7 +109,7 @@ class VoiceEngine:
                 buf = s
         if buf:
             chunks.append(buf.strip())
-        return chunks
+        return [VoiceEngine._restore_list_periods(c) for c in chunks]
 
     # ---------- generation ----------
     def generate(
