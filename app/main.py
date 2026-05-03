@@ -1,9 +1,12 @@
 """
 FastAPI server: web UI + JSON API for voice cloning and generation.
 """
+import io
 import os
+import re
 import tempfile
-from typing import Optional
+import zipfile
+from typing import List, Optional
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse, Response
@@ -15,6 +18,10 @@ from . import voice_store
 from . import auth
 
 app = FastAPI(title="Voice Clone Tool", version="1.1.0")
+
+# Split pasted “many questions” text into separate TTS jobs (own line, exact match).
+QUESTION_SPLIT_MARKER = "<<<QUESTION>>>"
+MAX_BATCH_QUESTIONS = 500
 
 app.add_middleware(
     CORSMiddleware,
@@ -157,6 +164,73 @@ async def api_generate(
         content=data,
         media_type="audio/wav",
         headers={"Content-Disposition": f'attachment; filename="{voice_id}.wav"'},
+    )
+
+
+def _split_questions_blob(raw: str) -> List[str]:
+    """Split user text on QUESTION_SPLIT_MARKER lines; trim and drop empties."""
+    parts = re.split(
+        rf"(?:^\s*{re.escape(QUESTION_SPLIT_MARKER)}\s*$)",
+        raw,
+        flags=re.MULTILINE,
+    )
+    out = [p.strip() for p in parts if p.strip()]
+    return out
+
+
+@app.post("/api/generate-batch", dependencies=[Depends(auth.require_auth)])
+async def api_generate_batch(
+    voice_id: str = Form(...),
+    text: str = Form(...),
+    speed: float = Form(1.0),
+):
+    """
+    One WAV per question, returned inside a single ZIP.
+    Separate questions in `text` with a line containing only: <<<QUESTION>>>
+    """
+    if engine is None:
+        raise HTTPException(503, "engine not ready")
+    ref = voice_store.get_reference_wav(voice_id)
+    if not ref:
+        raise HTTPException(404, "voice_id not found")
+    raw = (text or "").strip()
+    if not raw:
+        raise HTTPException(400, "text required")
+
+    questions = _split_questions_blob(raw)
+    if not questions:
+        raise HTTPException(400, "no question text after splitting")
+    if len(questions) > MAX_BATCH_QUESTIONS:
+        raise HTTPException(
+            400,
+            f"Too many questions ({len(questions)}). Maximum is {MAX_BATCH_QUESTIONS}.",
+        )
+
+    buf = io.BytesIO()
+    try:
+        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for i, q in enumerate(questions):
+                try:
+                    wav, sr = engine.generate(text=q, speaker_wav=ref, speed=speed)
+                except Exception as e:
+                    raise HTTPException(
+                        500,
+                        f"generation failed on question {i + 1} of {len(questions)}: {e}",
+                    ) from e
+                name = f"question_{i + 1:03d}.wav"
+                zf.writestr(name, VoiceEngine.to_wav_bytes(wav, sr))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"batch zip failed: {e}") from e
+
+    data = buf.getvalue()
+    return Response(
+        content=data,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": 'attachment; filename="questions.zip"',
+        },
     )
 
 

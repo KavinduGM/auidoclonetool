@@ -45,13 +45,19 @@
         <select name="voice_id" id="voiceSelect" required></select>
       </label>
       <label>Text
-        <textarea name="text" rows="10" required
-          placeholder="Paste any length of text here. It will be split into chunks and stitched into a single audio file."></textarea>
+        <textarea name="text" id="genText" rows="10" required
+          placeholder="English only. For quiz-style pauses use &lt;break /&gt; (1.5s by default) or &lt;break time=&quot;2s&quot; /&gt; between sections. Long text is chunked automatically."></textarea>
       </label>
+      <p class="hint" style="margin-top:8px;">
+        <strong>ZIP batch:</strong> put a line containing only <code>&lt;&lt;&lt;QUESTION&gt;&gt;&gt;</code> between each full question (stem, choices, answer, explanations). Each block becomes <code>question_001.wav</code>, <code>question_002.wav</code>, … inside one zip.
+      </p>
       <label>Speed: <span id="speedVal">1.00</span>x
         <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.05" value="1.0" />
       </label>
-      <button type="submit" id="genBtn">Generate &amp; Download</button>
+      <div class="btn-row" style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+        <button type="submit" id="genBtn">Generate one WAV</button>
+        <button type="button" id="genBtnZip">Generate ZIP (one WAV per question)</button>
+      </div>
       <div class="msg" id="genMsg"></div>
       <audio id="player" controls style="display:none; width:100%; margin-top:12px;"></audio>
     </form>

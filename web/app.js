@@ -232,18 +232,23 @@ $("#speed").addEventListener("input", (e) => {
 });
 
 // ---------- generate ----------
-$("#genForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
+async function runGenerate({ batchZip }) {
   const btn = $("#genBtn");
+  const btnZip = $("#genBtnZip");
   const msg = $("#genMsg");
   const player = $("#player");
-  msg.textContent = "Generating… (this can take a while for long text)";
+  const form = $("#genForm");
+  const endpoint = batchZip ? "/api/generate-batch" : "/api/generate";
+  msg.textContent = batchZip
+    ? "Generating ZIP (one WAV per question). This may take several minutes for many items…"
+    : "Generating… (this can take a while for long text)";
   msg.className = "msg";
   btn.disabled = true;
+  btnZip.disabled = true;
   player.style.display = "none";
   try {
-    const fd = new FormData(e.target);
-    const res = await fetch("/api/generate", {
+    const fd = new FormData(form);
+    const res = await fetch(endpoint, {
       method: "POST",
       body: fd,
       headers: apiKey ? { "X-API-Key": apiKey } : {},
@@ -254,25 +259,48 @@ $("#genForm").addEventListener("submit", async (e) => {
     }
     if (!res.ok) {
       let m = `HTTP ${res.status}`;
-      try { const j = await res.json(); m = j.detail || m; } catch {}
+      try {
+        const j = await res.json();
+        m = Array.isArray(j.detail) ? j.detail.map((x) => x.msg || x).join("; ") : (j.detail || m);
+      } catch {}
       throw new Error(m);
     }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
-    player.src = url;
-    player.style.display = "block";
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `voice_${Date.now()}.wav`;
-    document.body.appendChild(a); a.click(); a.remove();
-    msg.textContent = "Done. Audio downloaded.";
+    if (batchZip) {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `questions_${Date.now()}.zip`;
+      document.body.appendChild(a); a.click(); a.remove();
+      msg.textContent = "Done. ZIP downloaded.";
+    } else {
+      player.src = url;
+      player.style.display = "block";
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `voice_${Date.now()}.wav`;
+      document.body.appendChild(a); a.click(); a.remove();
+      msg.textContent = "Done. Audio downloaded.";
+    }
     msg.className = "msg ok";
   } catch (err) {
     msg.textContent = "Error: " + err.message;
     msg.className = "msg err";
   } finally {
     btn.disabled = false;
+    btnZip.disabled = false;
   }
+}
+
+$("#genForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  await runGenerate({ batchZip: false });
+});
+
+$("#genBtnZip").addEventListener("click", async () => {
+  const form = $("#genForm");
+  if (!form.reportValidity()) return;
+  await runGenerate({ batchZip: true });
 });
 
 // ---------- init ----------
