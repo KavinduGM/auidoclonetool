@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .tts_engine import VoiceEngine
 from . import voice_store
 from . import auth
+from . import batch_docx
 
 app = FastAPI(title="Voice Clone Tool", version="1.1.0")
 
@@ -61,6 +62,14 @@ def _css():
 def _js():
     return Response(
         content=open(os.path.join(WEB_DIR, "app.js")).read(),
+        media_type="application/javascript",
+    )
+
+
+@app.get("/batch_generate.js")
+def _batch_js():
+    return Response(
+        content=open(os.path.join(WEB_DIR, "batch_generate.js")).read(),
         media_type="application/javascript",
     )
 
@@ -232,6 +241,26 @@ async def api_generate_batch(
             "Content-Disposition": 'attachment; filename="questions.zip"',
         },
     )
+
+
+@app.post("/api/batch/parse-docx", dependencies=[Depends(auth.require_auth)])
+async def api_batch_parse_docx(file: UploadFile = File(...)):
+    """
+    Parse a .docx voice script (Format A: Voice N list; Format B: Animation Voice groups).
+    Returns JSON entries for client-side batch generation against /api/generate.
+    """
+    fname = (file.filename or "").lower()
+    if not fname.endswith(".docx"):
+        raise HTTPException(400, "Upload a .docx file.")
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "Empty file.")
+    try:
+        return batch_docx.parse_voice_docx(data)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(400, f"Could not read document: {e}")
 
 
 # ---------- Health (public) ----------

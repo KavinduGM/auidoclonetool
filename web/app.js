@@ -303,6 +303,10 @@ $("#genBtnZip").addEventListener("click", async () => {
   await runGenerate({ batchZip: true });
 });
 
+// Exposed for batch_generate.js (same-origin script load order)
+window.vctApi = api;
+window.vctShowLogin = showLogin;
+
 // ---------- init ----------
 async function init() {
   await refreshHealth();

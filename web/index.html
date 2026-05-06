@@ -64,7 +64,53 @@
   </section>
 
   <section class="card">
-    <h2>4. API keys</h2>
+    <h2>4. Batch generate (DOCX)</h2>
+    <p class="hint">
+      Upload a Word document with <strong>Voice 1</strong>, <strong>Voice 2</strong>, … as standalone lines (script lines follow until the next label).
+      For grouped projects, start a block with <strong>Animation Voice 1</strong> (or similar <code>Animation Voice …</code> header); each group becomes a subfolder.
+      Uses the same voice and speed as in section 3. Output format matches the TTS engine (<code>.wav</code>).
+    </p>
+    <label class="batch-folder-row">Output folder
+      <div class="batch-folder-actions">
+        <button type="button" id="batchPickFolder">Select output folder</button>
+      </div>
+      <div id="batchFolderPath" class="batch-folder">No folder selected. Uses the browser’s folder picker (Chrome / Edge, HTTPS or localhost).</div>
+    </label>
+    <label>Voice script (.docx)
+      <input type="file" id="batchDocxInput" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+    </label>
+    <div id="batchFormatLabel" class="hint" style="margin-bottom:0;"></div>
+    <div class="msg" id="batchParseMsg"></div>
+    <div class="batch-progress">
+      <div id="batchProgressSummary" class="batch-progress-line"></div>
+      <div id="batchProgressCurrent" class="batch-progress-current"></div>
+    </div>
+    <div class="batch-toolbar">
+      <button type="button" id="batchBtnStart" disabled>Start batch generate</button>
+      <button type="button" id="batchBtnPause" class="ghost" disabled>Pause</button>
+      <button type="button" id="batchBtnResume" class="ghost" disabled>Resume</button>
+      <button type="button" id="batchBtnCancel" class="ghost" disabled>Cancel queue</button>
+      <button type="button" id="batchBtnRetry" disabled>Retry failed</button>
+    </div>
+    <div class="msg" id="batchBatchMsg"></div>
+    <div class="batch-table-wrap">
+      <table class="batch-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Group</th>
+            <th>Voice</th>
+            <th>Preview</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="batchQueueBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>5. API keys</h2>
     <p class="hint">
       Use these keys to access this tool from other machines via HTTP.
       Send <code>X-API-Key: &lt;key&gt;</code> on every request.
@@ -101,5 +147,6 @@
 </div>
 
 <script src="app.js"></script>
+<script src="/batch_generate.js"></script>
 </body>
 </html>
