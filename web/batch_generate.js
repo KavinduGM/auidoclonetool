@@ -63,6 +63,13 @@
   }
 
   function pathPartsForEntry(entry) {
+    const ext = String(entry.audio_extension || "wav").replace(/^\./, "");
+    const fileSeg = `${entry.voice_label}.${ext}`;
+    const g = entry.group != null && String(entry.group).trim();
+    // Always use group + voice when the parser set a group (Format B), so subfolders are never skipped.
+    if (g) {
+      return [String(entry.group).trim(), fileSeg];
+    }
     if (Array.isArray(entry.path_parts) && entry.path_parts.length > 0) {
       return entry.path_parts.map((p) => String(p));
     }

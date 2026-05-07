@@ -67,7 +67,7 @@
     <h2>4. Batch generate (DOCX)</h2>
     <p class="hint">
       Upload a Word document with <strong>Voice 1</strong>, <strong>Voice 2</strong>, … as standalone lines (script lines follow until the next label).
-      For grouped projects, start a block with <strong>Animation Voice 1</strong> (or similar <code>Animation Voice …</code> header); each group becomes a subfolder.
+      For grouped projects, each block must include a line that starts with <strong>Animation Voice</strong> (e.g. <code>Animation Voice 1</code> or <code>Animation Voice 1 Folder</code>). Word auto-numbering (<code>1.</code>) and special spaces are OK. Each such line becomes a subfolder.
       Uses the same voice and speed as in section 3. Output format matches the TTS engine (<code>.wav</code>).
     </p>
     <label class="batch-folder-row">Output folder

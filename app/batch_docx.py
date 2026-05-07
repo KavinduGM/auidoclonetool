@@ -17,16 +17,56 @@ from docx.text.paragraph import Paragraph
 MAX_ENTRIES = 1000
 AUDIO_EXTENSION = "wav"
 
+# Leading "1." / "2)" / "a." / bullets — common in Word; strip only for *matching*, not from stored labels.
+_ENUM_PREFIX = re.compile(
+    r"^\s*(?:(?:\d+|[a-zA-Z])[\.\)]\s+|[•\-\*·▪▸]\s+)+",
+    re.UNICODE,
+)
 
-def _is_animation_header(line: str) -> bool:
-    return bool(re.match(r"^Animation\s+Voice\s+", line.strip(), re.IGNORECASE))
+
+def _normalized_display(raw: str) -> str:
+    """Normalize odd Word spaces so labels match the real text (minus invisible junk)."""
+    if not raw:
+        return ""
+    s = (
+        raw.replace("\u00a0", " ")
+        .replace("\u2007", " ")
+        .replace("\u202f", " ")
+        .replace("\u2009", " ")
+        .replace("\ufeff", "")
+    )
+    return s.strip()
 
 
-def _is_voice_label(line: str) -> bool:
-    s = line.strip()
-    if _is_animation_header(s):
+def _match_core(s: str) -> str:
+    """Text used to detect Animation / Voice headers after list/bullet prefixes."""
+    t = _normalized_display(s)
+    if not t:
+        return ""
+    m = _ENUM_PREFIX.match(t)
+    if m:
+        t = t[m.end() :].strip()
+    return t
+
+
+def _is_animation_header_line(raw: str) -> bool:
+    core = _match_core(raw)
+    if not core:
         return False
-    return bool(re.match(r"^Voice\s+", s, re.IGNORECASE))
+    return bool(re.match(r"^Animation\s+Voice\b", core, re.IGNORECASE))
+
+
+def _is_voice_label_line(raw: str) -> bool:
+    core = _match_core(raw)
+    if not core:
+        return False
+    if re.match(r"^Animation\s+Voice\b", core, re.IGNORECASE):
+        return False
+    # "Voice 1", "Voice 12", optional tight "Voice1"
+    return bool(
+        re.match(r"^Voice\s+\S", core, re.IGNORECASE)
+        or re.match(r"^Voice\d+\b", core, re.IGNORECASE)
+    )
 
 
 @dataclass
@@ -96,23 +136,23 @@ def parse_voice_docx(file_bytes: bytes, audio_extension: str = AUDIO_EXTENSION) 
         state.lines.clear()
 
     for raw_line in _iter_lines_from_doc(doc):
-        s = raw_line.strip()
-        if not s:
+        display = _normalized_display(raw_line)
+        if not display:
             continue
-        if _is_animation_header(s):
+        if _is_animation_header_line(raw_line):
             flush()
-            state.current_group = s.strip()
+            state.current_group = display
             state.current_voice = None
             state.saw_animation_header = True
             state.lines.clear()
             continue
-        if _is_voice_label(s):
+        if _is_voice_label_line(raw_line):
             flush()
-            state.current_voice = s.strip()
+            state.current_voice = display
             state.lines.clear()
             continue
         if state.current_voice:
-            state.lines.append(s)
+            state.lines.append(display)
 
     flush()
 
