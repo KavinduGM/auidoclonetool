@@ -66,15 +66,12 @@
     const ext = String(entry.audio_extension || "wav").replace(/^\./, "");
     const fileSeg = `${entry.voice_label}.${ext}`;
     const g = entry.group != null && String(entry.group).trim();
-    // Always use group + voice when the parser set a group (Format B), so subfolders are never skipped.
+    // Always rebuild the file segment from voice_label + current audio_extension, so the
+    // chosen WAV/MP3 format wins even if it was changed after the docx was parsed.
     if (g) {
       return [String(entry.group).trim(), fileSeg];
     }
-    if (Array.isArray(entry.path_parts) && entry.path_parts.length > 0) {
-      return entry.path_parts.map((p) => String(p));
-    }
-    const rp = String(entry.relative_path || "").replace(/\\/g, "/");
-    return rp.split("/").filter((p) => p.length > 0);
+    return [fileSeg];
   }
 
   async function writeWavToBatchRoot(entry, blob) {
@@ -97,9 +94,18 @@
     return rel;
   }
 
+  function currentFormat() {
+    if (typeof window.vctSelectedFormat === "function") {
+      return window.vctSelectedFormat();
+    }
+    const el = document.querySelector('input[name="format"]:checked');
+    return el && el.value === "mp3" ? "mp3" : "wav";
+  }
+
   async function fetchParseDocx(file) {
     const fd = new FormData();
     fd.append("file", file);
+    fd.append("audio_extension", currentFormat());
     const key = localStorage.getItem("vct_api_key") || "";
     const res = await fetch("/api/batch/parse-docx", {
       method: "POST",
@@ -123,11 +129,12 @@
     return res.json();
   }
 
-  async function generateOneWav(voiceId, text, speed) {
+  async function generateOneWav(voiceId, text, speed, fmt) {
     const fd = new FormData();
     fd.append("voice_id", voiceId);
     fd.append("text", text);
     fd.append("speed", String(speed));
+    fd.append("format", fmt || "wav");
     const key = localStorage.getItem("vct_api_key") || "";
     const res = await fetch("/api/generate", {
       method: "POST",
@@ -285,7 +292,10 @@
       setControlsEnabled();
 
       try {
-        const blob = await generateOneWav(voiceId, it.text, speed);
+        const fmt = currentFormat();
+        // Honor the radio even if it changed after parsing — overrides the parser's stamped extension.
+        it.audio_extension = fmt;
+        const blob = await generateOneWav(voiceId, it.text, speed, fmt);
         const savedPath = await writeWavToBatchRoot(it, blob);
         it.status = "done";
         it.savedAs = savedPath;

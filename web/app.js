@@ -232,6 +232,11 @@ $("#speed").addEventListener("input", (e) => {
 });
 
 // ---------- generate ----------
+function selectedFormat() {
+  const el = document.querySelector('input[name="format"]:checked');
+  return el && el.value === "mp3" ? "mp3" : "wav";
+}
+
 async function runGenerate({ batchZip }) {
   const btn = $("#genBtn");
   const btnZip = $("#genBtnZip");
@@ -239,8 +244,9 @@ async function runGenerate({ batchZip }) {
   const player = $("#player");
   const form = $("#genForm");
   const endpoint = batchZip ? "/api/generate-batch" : "/api/generate";
+  const fmt = selectedFormat();
   msg.textContent = batchZip
-    ? "Generating ZIP (one WAV per question). This may take several minutes for many items…"
+    ? `Generating ZIP (one .${fmt} per question). This may take several minutes for many items…`
     : "Generating… (this can take a while for long text)";
   msg.className = "msg";
   btn.disabled = true;
@@ -278,7 +284,7 @@ async function runGenerate({ batchZip }) {
       player.style.display = "block";
       const a = document.createElement("a");
       a.href = url;
-      a.download = `voice_${Date.now()}.wav`;
+      a.download = `voice_${Date.now()}.${fmt}`;
       document.body.appendChild(a); a.click(); a.remove();
       msg.textContent = "Done. Audio downloaded.";
     }
@@ -291,6 +297,8 @@ async function runGenerate({ batchZip }) {
     btnZip.disabled = false;
   }
 }
+
+window.vctSelectedFormat = selectedFormat;
 
 $("#genForm").addEventListener("submit", async (e) => {
   e.preventDefault();

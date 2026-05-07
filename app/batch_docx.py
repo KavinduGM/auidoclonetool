@@ -53,14 +53,15 @@ def _is_animation_header_line(raw: str) -> bool:
     core = _match_core(raw)
     if not core:
         return False
-    return bool(re.match(r"^Animation\s+Voice\b", core, re.IGNORECASE))
+    # Match any "Animation …" header: "Animation 1", "Animation Voice 1", "Animation - Intro", etc.
+    return bool(re.match(r"^Animation\b", core, re.IGNORECASE))
 
 
 def _is_voice_label_line(raw: str) -> bool:
     core = _match_core(raw)
     if not core:
         return False
-    if re.match(r"^Animation\s+Voice\b", core, re.IGNORECASE):
+    if re.match(r"^Animation\b", core, re.IGNORECASE):
         return False
     # "Voice 1", "Voice 12", optional tight "Voice1"
     return bool(
@@ -159,7 +160,7 @@ def parse_voice_docx(file_bytes: bytes, audio_extension: str = AUDIO_EXTENSION) 
     if not entries:
         raise ValueError(
             "No voice entries found. Use lines like 'Voice 1' as labels, "
-            "optionally under 'Animation Voice …' group headers."
+            "optionally under 'Animation …' group headers."
         )
     if len(entries) > MAX_ENTRIES:
         raise ValueError(f"Too many entries ({len(entries)}); maximum is {MAX_ENTRIES}.")

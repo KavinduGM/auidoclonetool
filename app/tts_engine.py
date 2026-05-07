@@ -5,6 +5,8 @@ Loads the model once at startup, reuses for all requests.
 import os
 import io
 import re
+import shutil
+import subprocess
 import torch
 import numpy as np
 import soundfile as sf
@@ -257,3 +259,24 @@ class VoiceEngine:
         buf = io.BytesIO()
         sf.write(buf, wav, sample_rate, format="WAV", subtype="PCM_16")
         return buf.getvalue()
+
+    @staticmethod
+    def to_mp3_bytes(wav: np.ndarray, sample_rate: int, bitrate: str = "192k") -> bytes:
+        """Encode the waveform as MP3 by piping WAV through ffmpeg + libmp3lame."""
+        if shutil.which("ffmpeg") is None:
+            raise RuntimeError("ffmpeg is required for MP3 export but was not found on PATH.")
+        wav_bytes = VoiceEngine.to_wav_bytes(wav, sample_rate)
+        proc = subprocess.run(
+            [
+                "ffmpeg", "-hide_banner", "-loglevel", "error",
+                "-f", "wav", "-i", "pipe:0",
+                "-codec:a", "libmp3lame", "-b:a", bitrate,
+                "-f", "mp3", "pipe:1",
+            ],
+            input=wav_bytes,
+            capture_output=True,
+            check=False,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(f"ffmpeg MP3 encode failed: {proc.stderr.decode('utf-8', 'ignore')}")
+        return proc.stdout

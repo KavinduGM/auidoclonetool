@@ -49,14 +49,19 @@
           placeholder="English only. For quiz-style pauses use &lt;break /&gt; (1.5s by default) or &lt;break time=&quot;2s&quot; /&gt; between sections. Long text is chunked automatically."></textarea>
       </label>
       <p class="hint" style="margin-top:8px;">
-        <strong>ZIP batch:</strong> put a line containing only <code>&lt;&lt;&lt;QUESTION&gt;&gt;&gt;</code> between each full question (stem, choices, answer, explanations). Each block becomes <code>question_001.wav</code>, <code>question_002.wav</code>, … inside one zip.
+        <strong>ZIP batch:</strong> put a line containing only <code>&lt;&lt;&lt;QUESTION&gt;&gt;&gt;</code> between each full question (stem, choices, answer, explanations). Each block becomes <code>question_001</code>, <code>question_002</code>, … in the chosen format inside one zip.
       </p>
       <label>Speed: <span id="speedVal">1.00</span>x
         <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.05" value="1.0" />
       </label>
+      <fieldset id="formatPicker" style="margin:8px 0; padding:6px 10px; border:1px solid #ccc;">
+        <legend style="padding:0 4px;">Output format</legend>
+        <label style="margin-right:14px;"><input type="radio" name="format" value="wav" checked /> WAV</label>
+        <label><input type="radio" name="format" value="mp3" /> MP3</label>
+      </fieldset>
       <div class="btn-row" style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
-        <button type="submit" id="genBtn">Generate one WAV</button>
-        <button type="button" id="genBtnZip">Generate ZIP (one WAV per question)</button>
+        <button type="submit" id="genBtn">Generate one file</button>
+        <button type="button" id="genBtnZip">Generate ZIP (one file per question)</button>
       </div>
       <div class="msg" id="genMsg"></div>
       <audio id="player" controls style="display:none; width:100%; margin-top:12px;"></audio>
@@ -67,8 +72,8 @@
     <h2>4. Batch generate (DOCX)</h2>
     <p class="hint">
       Upload a Word document with <strong>Voice 1</strong>, <strong>Voice 2</strong>, … as standalone lines (script lines follow until the next label).
-      For grouped projects, each block must include a line that starts with <strong>Animation Voice</strong> (e.g. <code>Animation Voice 1</code> or <code>Animation Voice 1 Folder</code>). Word auto-numbering (<code>1.</code>) and special spaces are OK. Each such line becomes a subfolder.
-      Uses the same voice and speed as in section 3. Output format matches the TTS engine (<code>.wav</code>).
+      For grouped projects, each block must include a line that starts with <strong>Animation</strong> (e.g. <code>Animation 1</code>, <code>Animation Voice 1</code>, or <code>Animation 1 Intro</code>). Word auto-numbering (<code>1.</code>) and special spaces are OK. Each such line becomes a subfolder.
+      Uses the same voice, speed, and output format (WAV / MP3) selected in section 3.
     </p>
     <label class="batch-folder-row">Output folder
       <div class="batch-folder-actions">

@@ -24,6 +24,22 @@ app = FastAPI(title="Voice Clone Tool", version="1.1.0")
 QUESTION_SPLIT_MARKER = "<<<QUESTION>>>"
 MAX_BATCH_QUESTIONS = 500
 
+_ALLOWED_FORMATS = {"wav", "mp3"}
+
+
+def _normalize_format(fmt: str) -> str:
+    f = (fmt or "wav").strip().lower().lstrip(".")
+    if f not in _ALLOWED_FORMATS:
+        raise HTTPException(400, f"Unsupported format '{fmt}'. Use wav or mp3.")
+    return f
+
+
+def _encode_audio(wav, sr, fmt: str) -> tuple[bytes, str]:
+    """Returns (bytes, media_type) for the given format."""
+    if fmt == "mp3":
+        return VoiceEngine.to_mp3_bytes(wav, sr), "audio/mpeg"
+    return VoiceEngine.to_wav_bytes(wav, sr), "audio/wav"
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -156,6 +172,7 @@ async def api_generate(
     voice_id: str = Form(...),
     text: str = Form(...),
     speed: float = Form(1.0),
+    format: str = Form("wav"),
 ):
     if engine is None:
         raise HTTPException(503, "engine not ready")
@@ -164,15 +181,19 @@ async def api_generate(
         raise HTTPException(404, "voice_id not found")
     if not text.strip():
         raise HTTPException(400, "text required")
+    fmt = _normalize_format(format)
     try:
         wav, sr = engine.generate(text=text, speaker_wav=ref, speed=speed)
     except Exception as e:
         raise HTTPException(500, f"generation failed: {e}")
-    data = VoiceEngine.to_wav_bytes(wav, sr)
+    try:
+        data, media_type = _encode_audio(wav, sr, fmt)
+    except RuntimeError as e:
+        raise HTTPException(500, str(e))
     return Response(
         content=data,
-        media_type="audio/wav",
-        headers={"Content-Disposition": f'attachment; filename="{voice_id}.wav"'},
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{voice_id}.{fmt}"'},
     )
 
 
@@ -192,9 +213,10 @@ async def api_generate_batch(
     voice_id: str = Form(...),
     text: str = Form(...),
     speed: float = Form(1.0),
+    format: str = Form("wav"),
 ):
     """
-    One WAV per question, returned inside a single ZIP.
+    One audio file per question, returned inside a single ZIP.
     Separate questions in `text` with a line containing only: <<<QUESTION>>>
     """
     if engine is None:
@@ -205,6 +227,7 @@ async def api_generate_batch(
     raw = (text or "").strip()
     if not raw:
         raise HTTPException(400, "text required")
+    fmt = _normalize_format(format)
 
     questions = _split_questions_blob(raw)
     if not questions:
@@ -226,8 +249,12 @@ async def api_generate_batch(
                         500,
                         f"generation failed on question {i + 1} of {len(questions)}: {e}",
                     ) from e
-                name = f"question_{i + 1:03d}.wav"
-                zf.writestr(name, VoiceEngine.to_wav_bytes(wav, sr))
+                try:
+                    payload, _ = _encode_audio(wav, sr, fmt)
+                except RuntimeError as e:
+                    raise HTTPException(500, str(e)) from e
+                name = f"question_{i + 1:03d}.{fmt}"
+                zf.writestr(name, payload)
     except HTTPException:
         raise
     except Exception as e:
@@ -244,10 +271,14 @@ async def api_generate_batch(
 
 
 @app.post("/api/batch/parse-docx", dependencies=[Depends(auth.require_auth)])
-async def api_batch_parse_docx(file: UploadFile = File(...)):
+async def api_batch_parse_docx(
+    file: UploadFile = File(...),
+    audio_extension: str = Form("wav"),
+):
     """
-    Parse a .docx voice script (Format A: Voice N list; Format B: Animation Voice groups).
+    Parse a .docx voice script (Format A: Voice N list; Format B: Animation groups).
     Returns JSON entries for client-side batch generation against /api/generate.
+    `audio_extension` controls the extension stamped into relative_path / path_parts.
     """
     fname = (file.filename or "").lower()
     if not fname.endswith(".docx"):
@@ -255,8 +286,9 @@ async def api_batch_parse_docx(file: UploadFile = File(...)):
     data = await file.read()
     if not data:
         raise HTTPException(400, "Empty file.")
+    ext = _normalize_format(audio_extension)
     try:
-        return batch_docx.parse_voice_docx(data)
+        return batch_docx.parse_voice_docx(data, audio_extension=ext)
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception as e:
