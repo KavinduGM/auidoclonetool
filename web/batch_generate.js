@@ -64,10 +64,11 @@
 
   function pathPartsForEntry(entry) {
     const ext = String(entry.audio_extension || "wav").replace(/^\./, "");
-    const fileSeg = `${entry.voice_label}.${ext}`;
     const g = entry.group != null && String(entry.group).trim();
-    // Always rebuild the file segment from voice_label + current audio_extension, so the
-    // chosen WAV/MP3 format wins even if it was changed after the docx was parsed.
+    // Format A only: prefer the docx "Voice Name: …" value if the parser captured one.
+    // Format B keeps Voice N as the filename so the existing layout never changes.
+    const stem = (!g && entry.file_stem) ? entry.file_stem : entry.voice_label;
+    const fileSeg = `${stem}.${ext}`;
     if (g) {
       return [String(entry.group).trim(), fileSeg];
     }
@@ -171,10 +172,13 @@
         const group = it.group ? escapeHtml(it.group) : "—";
         const st = it.status;
         const errHtml = it.error ? `<div class="batch-err">${escapeHtml(it.error)}</div>` : "";
+        const customName = (!it.group && it.voice_name)
+          ? `<div class="batch-voice-name" style="color:var(--muted);font-size:0.85em;">${escapeHtml(it.voice_name)}</div>`
+          : "";
         return `<tr data-idx="${idx}">
           <td>${it.order + 1}</td>
           <td>${group}</td>
-          <td>${escapeHtml(it.voice_label)}</td>
+          <td>${escapeHtml(it.voice_label)}${customName}</td>
           <td class="batch-preview">${escapeHtml(prev)}</td>
           <td><span class="batch-status batch-status--${st}">${st}</span>${errHtml}</td>
         </tr>`;

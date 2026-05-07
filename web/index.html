@@ -73,6 +73,7 @@
     <p class="hint">
       Upload a Word document with <strong>Voice 1</strong>, <strong>Voice 2</strong>, … as standalone lines (script lines follow until the next label).
       For grouped projects, each block must include a line that starts with <strong>Animation</strong> (e.g. <code>Animation 1</code>, <code>Animation Voice 1</code>, or <code>Animation 1 Intro</code>). Word auto-numbering (<code>1.</code>) and special spaces are OK. Each such line becomes a subfolder.
+      <strong>Format A only:</strong> if a line <code>Voice Name: P3: What Are Virulence Factors</code> appears right before a <code>Voice N</code> block, that text becomes the saved filename instead of <code>Voice N</code> (filesystem-illegal characters like <code>:</code> are replaced with <code>_</code>).
       Uses the same voice, speed, and output format (WAV / MP3) selected in section 3.
     </p>
     <label class="batch-folder-row">Output folder
