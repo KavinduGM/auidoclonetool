@@ -63,7 +63,7 @@ def parse_voice_docx(file_bytes: bytes, audio_extension: str = AUDIO_EXTENSION) 
     Returns:
       format: "A" | "B"
       audio_extension: str
-      entries: list of { order, group, voice_label, text, relative_path }
+      entries: list of { order, group, voice_label, text, relative_path, path_parts }
     """
     doc = Document(io.BytesIO(file_bytes))
     state = _ParseState()
@@ -78,8 +78,11 @@ def parse_voice_docx(file_bytes: bytes, audio_extension: str = AUDIO_EXTENSION) 
         label = state.current_voice
         if group:
             rel = f"{group}/{label}.{audio_extension}"
+            # Explicit segments so the web client always creates one subfolder per group (Format B).
+            path_parts = [group, f"{label}.{audio_extension}"]
         else:
             rel = f"{label}.{audio_extension}"
+            path_parts = [f"{label}.{audio_extension}"]
         entries.append(
             {
                 "order": len(entries),
@@ -87,6 +90,7 @@ def parse_voice_docx(file_bytes: bytes, audio_extension: str = AUDIO_EXTENSION) 
                 "voice_label": label,
                 "text": text,
                 "relative_path": rel,
+                "path_parts": path_parts,
             }
         )
         state.lines.clear()

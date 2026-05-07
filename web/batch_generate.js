@@ -44,20 +44,50 @@
     throw new Error("Could not find a unique filename");
   }
 
+  /**
+   * Create or open a subfolder. If a *file* already uses this name, try name_1, name_2…
+   * (TypeMismatchError from the File System Access API).
+   */
+  async function getOrCreateDirectorySafe(parentHandle, safeSegment) {
+    if (!safeSegment) throw new Error("Invalid folder name");
+    for (let n = 0; n < 999; n++) {
+      const name = n === 0 ? safeSegment : `${safeSegment}_${n}`;
+      try {
+        return await parentHandle.getDirectoryHandle(name, { create: true });
+      } catch (err) {
+        if (err && err.name === "TypeMismatchError") continue;
+        throw err;
+      }
+    }
+    throw new Error(`Could not create folder (blocked by a file?): ${safeSegment}`);
+  }
+
+  function pathPartsForEntry(entry) {
+    if (Array.isArray(entry.path_parts) && entry.path_parts.length > 0) {
+      return entry.path_parts.map((p) => String(p));
+    }
+    const rp = String(entry.relative_path || "").replace(/\\/g, "/");
+    return rp.split("/").filter((p) => p.length > 0);
+  }
+
   async function writeWavToBatchRoot(entry, blob) {
-    const safeParts = entry.relative_path.split("/").map(fsSafeSegment);
+    if (!batchDirHandle) throw new Error("No output folder selected");
+    const rawParts = pathPartsForEntry(entry);
+    if (!rawParts.length) throw new Error("Missing output path for entry");
+    const safeParts = rawParts.map(fsSafeSegment);
     const fileName = safeParts[safeParts.length - 1];
     const dirParts = safeParts.slice(0, -1);
     let dh = batchDirHandle;
     for (const seg of dirParts) {
-      dh = await dh.getDirectoryHandle(seg, { create: true });
+      dh = await getOrCreateDirectorySafe(dh, seg);
     }
     const unique = await uniqueFileName(dh, fileName);
     const fh = await dh.getFileHandle(unique, { create: true });
     const w = await fh.createWritable();
     await w.write(blob);
     await w.close();
-    return dirParts.length ? `${dirParts.join("/")}/${unique}` : unique;
+    const rel = dirParts.length ? `${dirParts.join("/")}/${unique}` : unique;
+    return rel;
   }
 
   async function fetchParseDocx(file) {
@@ -321,6 +351,7 @@
       const data = await fetchParseDocx(f);
       queueItems = data.entries.map((en) => ({
         ...en,
+        audio_extension: data.audio_extension,
         status: "pending",
         error: null,
         savedAs: null,
