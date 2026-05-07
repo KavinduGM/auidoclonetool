@@ -69,23 +69,24 @@
   </section>
 
   <section class="card">
-    <h2>4. Batch generate (DOCX)</h2>
+    <h2>4. Batch generate (DOCX queue)</h2>
     <p class="hint">
-      Upload a Word document with <strong>Voice 1</strong>, <strong>Voice 2</strong>, … as standalone lines (script lines follow until the next label).
-      For grouped projects, each block must include a line that starts with <strong>Animation</strong> (e.g. <code>Animation 1</code>, <code>Animation Voice 1</code>, or <code>Animation 1 Intro</code>). Word auto-numbering (<code>1.</code>) and special spaces are OK. Each such line becomes a subfolder.
-      <strong>Format A only:</strong> if a line <code>Voice Name: P3: What Are Virulence Factors</code> appears right before a <code>Voice N</code> block, that text becomes the saved filename instead of <code>Voice N</code> (filesystem-illegal characters like <code>:</code> are replaced with <code>_</code>).
+      Add one or more Word documents. Each document gets its own subfolder under the selected output folder, then audio is generated for every <code>Voice N</code> block inside it.
+      <strong>Format A</strong> (Voice 1, Voice 2 … flat list) saves files directly inside the doc subfolder; <strong>Format B</strong> (with <code>Animation N</code> headers) saves into per-group subfolders.
+      <strong>Format A only:</strong> a <code>Voice Name: P3: What Are Virulence Factors</code> line before a <code>Voice N</code> block becomes the saved filename (illegal characters like <code>:</code> are replaced with <code>_</code>).
       Uses the same voice, speed, and output format (WAV / MP3) selected in section 3.
     </p>
     <label class="batch-folder-row">Output folder
       <div class="batch-folder-actions">
         <button type="button" id="batchPickFolder">Select output folder</button>
       </div>
-      <div id="batchFolderPath" class="batch-folder">No folder selected. Uses the browser’s folder picker (Chrome / Edge, HTTPS or localhost).</div>
+      <div id="batchFolderPath" class="batch-folder">No folder selected. Uses the browser's folder picker (Chrome / Edge, HTTPS or localhost).</div>
     </label>
-    <label>Voice script (.docx)
-      <input type="file" id="batchDocxInput" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
-    </label>
-    <div id="batchFormatLabel" class="hint" style="margin-bottom:0;"></div>
+    <div class="batch-add-row" style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <button type="button" id="batchAddDoc">Add document…</button>
+      <span class="hint" style="margin:0;">Add as many as you want. Each row's subfolder name is editable until generation starts.</span>
+      <input type="file" id="batchDocxInput" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" />
+    </div>
     <div class="msg" id="batchParseMsg"></div>
     <div class="batch-progress">
       <div id="batchProgressSummary" class="batch-progress-line"></div>
@@ -96,7 +97,7 @@
       <button type="button" id="batchBtnPause" class="ghost" disabled>Pause</button>
       <button type="button" id="batchBtnResume" class="ghost" disabled>Resume</button>
       <button type="button" id="batchBtnCancel" class="ghost" disabled>Cancel queue</button>
-      <button type="button" id="batchBtnRetry" disabled>Retry failed</button>
+      <button type="button" id="batchBtnClear" class="ghost" disabled>Clear queue</button>
     </div>
     <div class="msg" id="batchBatchMsg"></div>
     <div class="batch-table-wrap">
@@ -104,10 +105,11 @@
         <thead>
           <tr>
             <th>#</th>
-            <th>Group</th>
-            <th>Voice</th>
-            <th>Preview</th>
+            <th>Document</th>
+            <th>Subfolder name</th>
+            <th>Voices</th>
             <th>Status</th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="batchQueueBody"></tbody>
